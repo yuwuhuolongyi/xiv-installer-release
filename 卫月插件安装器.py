@@ -76,6 +76,24 @@ def find_xivlauncher():
             results.append((d, infer_alias(name)))
     return results
 
+def find_pack_server(app_dir):
+    """根据安装器同目录的 XIVLauncherTC/CN/国际服 文件夹判定端别。
+    分发场景下安装器就躺在插件包目录里，旁边的 XIVLauncherXX 文件夹即端别身份证。
+    返回 (端目录名, alias, server) 或 None。"""
+    for name, alias, server in (
+        ("XIVLauncherTC", "台服", "tc"),
+        ("XIVLauncherCN", "国服", "cn"),
+        ("XIVLauncher", "国际服", "global"),
+    ):
+        if os.path.isdir(os.path.join(app_dir, name)):
+            return (name, alias, server)
+    return None
+
+def resolve_target_dir(server_name):
+    """端目录名 -> 用户机器上的卫月目录（%APPDATA%/name）"""
+    appdata = os.environ.get("APPDATA", "")
+    return os.path.join(appdata, server_name) if appdata else ""
+
 def parse_repo_file(filepath):
     fname = os.path.basename(filepath)
     name = fname[5:-4] if fname.startswith("repo_") else os.path.splitext(fname)[0]
@@ -345,12 +363,16 @@ class XIVPluginInstaller:
         app_dir = get_app_dir()
         self.repo_files = scan_repos(app_dir)
         self.plugin_pack_dir, self.plugin_pack_count = find_plugin_pack(app_dir)
-        detected = find_xivlauncher()
-        self.target_dir = detected[0][0] if detected else ""
-        self.target_alias = detected[0][1] if detected else ""
-        self.server = "tc" if "TC" in self.target_dir.upper() else ("cn" if "CN" in self.target_dir.upper() else "global")
-        self.detected_targets = detected
-        self.can_install = bool(self.repo_files and self.plugin_pack_dir and self.target_dir)
+        pack = find_pack_server(app_dir)
+        if pack:
+            _name, self.target_alias, self.server = pack
+            self.target_dir = resolve_target_dir(_name)
+        else:
+            self.target_dir = ""
+            self.target_alias = ""
+            self.server = "global"
+        self.detected_targets = [(self.target_dir, self.target_alias)] if self.target_dir else []
+        self.can_install = bool(self.repo_files and self.plugin_pack_dir and self._target_ready())
         self.phase = "scanning"
 
         # Simple full-window canvas (no scroll)
@@ -587,10 +609,10 @@ class XIVPluginInstaller:
             txt = f"卫月目录  ·  {os.path.basename(self.target_dir)}"
             if self.target_alias:
                 txt += f"  ·  {self.target_alias}"
-            if multi:
-                txt += f"  ·  点击切换 (共 {len(self.detected_targets)} 端)"
+            if not os.path.isfile(os.path.join(self.target_dir, "dalamudConfig.json")):
+                txt += "  ·  未启动(请先运行卫月一次)"
         else:
-            txt = "卫月目录  ·  未找到"
+            txt = "卫月目录  ·  未找到(插件包未含 XIVLauncher 目录)"
         self.cv.create_text(bx3, by3+6, text=txt, anchor="w",
                            font=(F, 11, "bold"),
                            fill=C["success"] if self.target_dir else C["warning"],
@@ -621,7 +643,7 @@ class XIVPluginInstaller:
             missing = []
             if not self.repo_files: missing.append("仓库文件")
             if not self.plugin_pack_dir: missing.append("插件包")
-            if not self.target_dir: missing.append("卫月目录")
+            if not self._target_ready(): missing.append("卫月目录(请先运行卫月)")
             verdict_txt = f"⚠  缺 少 : {' / '.join(missing)}"
             verdict_color = C["warning"]
         self.cv.create_text(cx, verdict_y, text=verdict_txt,
@@ -750,6 +772,11 @@ class XIVPluginInstaller:
         self.server = "tc" if "TC" in up else ("cn" if "CN" in up else "global")
         self._refresh_state()
 
+    def _target_ready(self):
+        """目标卫月目录是否已就绪（存在 dalamudConfig.json）"""
+        return bool(self.target_dir) and os.path.isfile(
+            os.path.join(self.target_dir, "dalamudConfig.json"))
+
     def _choose_target(self):
         """多端时弹框让用户选择要把插件装到哪个端"""
         if getattr(self, "_choosing", False):
@@ -843,21 +870,22 @@ class XIVPluginInstaller:
         self._choosing = False
 
     def _auto_resolve_target(self):
-        """重新检测后：单端直选，多端弹框让用户选"""
-        detected = find_xivlauncher()
-        self.detected_targets = detected
-        if not detected:
+        """重新检测：根据安装器同目录的插件包判定端别，目标指向 %APPDATA%/对应端"""
+        app_dir = get_app_dir()
+        pack = find_pack_server(app_dir)
+        if pack:
+            _name, self.target_alias, self.server = pack
+            self.target_dir = resolve_target_dir(_name)
+            self.detected_targets = [(self.target_dir, self.target_alias)]
+        else:
             self.target_dir = ""
             self.target_alias = ""
             self.server = "global"
-            self._refresh_state()
-        elif len(detected) == 1:
-            self._set_target(detected[0][0])
-        else:
-            self._choose_target()
+            self.detected_targets = []
+        self._refresh_state()
 
     def _refresh_state(self):
-        self.can_install = bool(self.repo_files and self.plugin_pack_dir and self.target_dir)
+        self.can_install = bool(self.repo_files and self.plugin_pack_dir and self._target_ready())
         self.phase = "revealed"
         w = self.cv.winfo_width()
         h = self.cv.winfo_height()
@@ -875,7 +903,7 @@ class XIVPluginInstaller:
             missing = []
             if not self.repo_files: missing.append("仓库文件")
             if not self.plugin_pack_dir: missing.append("插件包")
-            if not self.target_dir: missing.append("卫月目录")
+            if not self._target_ready(): missing.append("卫月目录(请先运行卫月)")
             msg_error(self.root, "未就绪", f"缺少: {'、'.join(missing)}。",
                        [f"当前目录未检测到完整的安装要素"],
                        ["将所需文件放入同一目录后点击「重新检测」"])
