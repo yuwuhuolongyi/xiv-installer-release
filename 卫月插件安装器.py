@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
 # ///M XIVLAUNCHER PLUGIN INSTALLER — 闲鱼沉溺海豚亭
-import os, sys, json, shutil, tkinter as tk, base64
+import os, sys, json, re, shutil, tkinter as tk, base64
 from tkinter import ttk, filedialog, messagebox, Toplevel
 from pathlib import Path
 
 # watermark (base64 encoded to avoid plaintext in binary)
 _WM = base64.b64decode('6Zey6bG85rKJ5rq65rW36LGa5Lqt').decode('utf-8')
+
+# repo_*.txt 里可能有说明行（如 "OFFICIAL"、注释文字）。旧版把非空行一律
+# 当 URL 写进客户 dalamudConfig.json，客户卫月里就多出加载失败的无意义条目。
+# 这里只放行「合法域名的 http(s) 行」，但店铺防倒卖水印行有意保留
+# （让买家在卫月仓库列表里看得见）。
+_REPO_URL_RE = re.compile(r"^https?://[A-Za-z0-9.\-]+(:\d+)?(/|$)")
+_WM_KEEP = "沉溺海豚亭"
+
+def filter_repo_lines(lines):
+    out = []
+    for l in lines:
+        s = l.strip()
+        if _REPO_URL_RE.match(s) or _WM_KEEP in s:
+            out.append(s)
+    return out
 
 C = {
     "canvas":"#000000","surface_card":"#1a1a1a","surface_elevated":"#262626",
@@ -32,7 +47,7 @@ def scan_repos(app_dir):
         name = f[5:-4]
         try:
             with open(fp, "r", encoding="utf-8") as fh:
-                urls = [l.strip() for l in fh if l.strip()]
+                urls = filter_repo_lines(fh)
         except Exception: urls = []
         if urls: results.append((fp, name, urls))
     return results
@@ -99,7 +114,7 @@ def parse_repo_file(filepath):
     name = fname[5:-4] if fname.startswith("repo_") else os.path.splitext(fname)[0]
     try:
         with open(filepath, "r", encoding="utf-8") as f:
-            urls = [l.strip() for l in f if l.strip()]
+            urls = filter_repo_lines(f)
     except Exception: urls = []
     return name, urls
 
