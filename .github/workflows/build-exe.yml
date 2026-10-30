@@ -9,8 +9,15 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install pyinstaller
-      - run: pyinstaller --onefile --noconsole --name "卫月插件安装器" 卫月插件安装器.py
+      - name: Build installer
+        run: pyinstaller --onefile --noconsole --name "卫月插件安装器" 卫月插件安装器.py
+      - name: Build keybound guide
+        run: pyinstaller --onefile --noconsole --name "kb-guide" kb_guide.py
       - uses: actions/upload-artifact@v4
         with:
           name: 卫月插件安装器-Windows
           path: dist/卫月插件安装器.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kb-guide-windows
+          path: dist/kb-guide.exe
