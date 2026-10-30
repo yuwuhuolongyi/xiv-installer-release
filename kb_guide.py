@@ -165,9 +165,10 @@ def prepare(det):
                 os.makedirs(ips, exist_ok=True)
                 dst = os.path.join(ips, "YesAlready")
                 if os.path.isdir(dst):
-                    shutil.rmtree(dst, ignore_errors=True)
-                shutil.copytree(src_ya, dst)
-                log.append("配套插件已安装")
+                    log.append("配套插件已存在，保留原状")
+                else:
+                    shutil.copytree(src_ya, dst)
+                    log.append("配套插件已安装")
             except Exception:
                 log.append("配套插件复制失败（不影响主插件）")
 
@@ -607,9 +608,13 @@ class Guide(tk.Tk):
         self.pin_btn.set_text("置顶：开" if self.pin_on else "置顶：关")
 
     def _open_basic(self):
-        p = os.path.join(app_dir(), "教程", "基础文件下载地址.txt")
-        if not os.path.isfile(p):
-            p = os.path.join(app_dir(), "基础文件下载地址.txt")
+        cands = [
+            os.path.normpath(os.path.join(app_dir(), "..", "教程", "基础文件下载地址.txt")),
+            os.path.join(app_dir(), "教程", "基础文件下载地址.txt"),
+            os.path.join(app_dir(), "基础文件下载地址.txt"),
+            os.path.normpath(os.path.join(app_dir(), "..", "基础文件下载地址.txt")),
+        ]
+        p = next((x for x in cands if os.path.isfile(x)), cands[0])
         if not open_path(p):
             self.hint.configure(text="找不到《基础文件下载地址.txt》，请到教程文件夹里手动打开")
 
