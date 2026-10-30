@@ -558,6 +558,13 @@ class Guide(tk.Tk):
             self._notice(tip, C["success"], "环境没问题，可以开始",
                          "接下来七步，每做完一步点右下角的按钮。全程照做，大约 5 分钟。")
 
+        # 主按钮门槛：卫月装了、包完整才让开始；没启动过没关系，第 1 步就是开游戏
+        can_start = d["installed"] and d["has_dll"]
+        self.btn_next.set_enabled(can_start)
+        if not can_start:
+            self.btn_next.set_text("先处理上面的问题")
+            self.hint.configure(text="上面红色的项处理完，这里才能点")
+
         act = tk.Frame(wrap, bg=C["bg"])
         act.pack(fill="x", pady=(16, 0))
         Button(act, "打开基础文件下载地址", self._open_basic,
