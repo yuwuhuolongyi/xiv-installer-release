@@ -156,23 +156,36 @@ def prepare(det):
     else:
         return False, "包内找不到 魔光键影插件\\KeyboundBrawler.dll，请重新解压完整压缩包"
 
-    # ② 装 YesAlready（标准插件，直接放进卫月插件目录；已有就覆盖为同版本）
-    if det["ready"]:
-        ips = os.path.join(det["cfg_dir"], "installedPlugins")
-        src_ya = yesalready_src()
-        if os.path.isdir(src_ya):
-            try:
-                os.makedirs(ips, exist_ok=True)
-                dst = os.path.join(ips, "YesAlready")
-                if os.path.isdir(dst):
-                    log.append("配套插件已存在，保留原状")
-                else:
-                    shutil.copytree(src_ya, dst)
-                    log.append("配套插件已安装")
-            except Exception:
-                log.append("配套插件复制失败（不影响主插件）")
+    # ② 装 YesAlready（标准插件，直接放进卫月插件目录）
+    ok_ya, msg_ya = install_yesalready(det)
+    if ok_ya:
+        log.append(msg_ya)
 
     return True, "；".join(log) if log else "文件已就位"
+
+
+def install_yesalready(det):
+    """把配套的 YesAlready 放进卫月插件目录。
+
+    卫月只在启动时读配置，客户如果还没开过游戏，配置目录不存在，
+    这一步就先跳过；引导过程中每点一次「下一步」都会重试一次，
+    等客户把游戏开起来（第 1 步）之后就能补上。
+    """
+    if not det.get("ready"):
+        return False, ""
+    ips = os.path.join(det["cfg_dir"], "installedPlugins")
+    src = yesalready_src()
+    if not os.path.isdir(src):
+        return False, ""
+    try:
+        os.makedirs(ips, exist_ok=True)
+        dst = os.path.join(ips, "YesAlready")
+        if os.path.isdir(dst):
+            return True, "配套插件已存在"
+        shutil.copytree(src, dst)
+        return True, "配套插件已安装"
+    except Exception:
+        return False, ""
 
 
 # ══════════════════════════ 步骤内容 ══════════════════════════
@@ -422,6 +435,7 @@ class Guide(tk.Tk):
         self.state_ok = False
         self.step = -1          # -1 = 欢迎页
         self.prepared = False
+        self.ya_done = False
 
         self._build()
         self._show_welcome()
@@ -738,6 +752,14 @@ class Guide(tk.Tk):
             self._show_step(0)
             return
 
+        # 客户此时多半已开过游戏，配置目录有了就把配套插件补上
+        if not self.ya_done:
+            ok_ya, msg_ya = install_yesalready(detect())
+            if ok_ya:
+                self.ya_done = True
+                if "已安装" in msg_ya:
+                    self.hint.configure(text=msg_ya + "，重启卫月后生效")
+
         if self.step >= len(STEPS) - 1:
             self.destroy()
             return
@@ -754,6 +776,8 @@ class Guide(tk.Tk):
         self.prepared = ok
         if ok:
             self.det = detect()
+            if "已存在" in msg or "已安装" in msg:
+                self.ya_done = True
         return ok, msg
 
 
