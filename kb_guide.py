@@ -653,6 +653,7 @@ class Guide(tk.Tk):
 
         s = STEPS[idx]
         self.btn_back.set_enabled(True)
+        self.btn_next.set_enabled(True)
         last = idx == len(STEPS) - 1
         self.btn_next.set_text("完成，关闭 →" if last else "我做好了，下一步 →")
         self.hint.configure(text="第 %d / %d 步" % (idx + 1, len(STEPS)))
