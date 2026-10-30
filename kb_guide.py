@@ -405,7 +405,7 @@ class StepRail(tk.Canvas):
             self.create_text(x + 32, cy, text=s["rail"], fill=color, anchor="w",
                              font=(F, 11, weight), width=SIDE_W - x - 46)
 
-        bot = 700 - 84 - 46
+        bot = (WIN_H - 66 - 84) - 44
         self.create_line(24, bot, SIDE_W - 24, bot, fill=C["line"])
         self.create_text(28, bot + 16, text="沉溺海豚亭 · 闲鱼同名店铺",
                          fill=C["muted"], anchor="w", font=(F, 9))
@@ -537,8 +537,10 @@ class Guide(tk.Tk):
 
         tk.Label(wrap, text="先确认三件事", bg=C["bg"], fg=C["text"],
                  font=(F, 18, "bold"), anchor="w").pack(fill="x")
-        tk.Label(wrap, text="下面三项会自动检测，都是绿的就能开始。",
-                 bg=C["bg"], fg=C["sub"], font=(F, 10), anchor="w").pack(fill="x", pady=(4, 16))
+        tk.Label(wrap, text="三项自动检测。卫月和插件文件都找到了就能开始；\n"
+                           "第二项红了不要紧——第 1 步就是开游戏，开完自然就有了。",
+                 bg=C["bg"], fg=C["sub"], font=(F, 10), anchor="w",
+                 justify="left").pack(fill="x", pady=(4, 14))
 
         rows = tk.Frame(wrap, bg=C["bg"])
         rows.pack(fill="x")
